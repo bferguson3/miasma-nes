@@ -65,6 +65,7 @@ PlayerY: .byte 0
 Sprite_0 EQU $0200 
 PlayerSprites EQU $0204     ; $0204-$0213 
 
+
  .org $8000 ; code bank start
 
 ;;;;;;;;;;;;;
@@ -165,38 +166,34 @@ init:
     bcc .pal_loop
 
     ; copy in nam data 
-;    lda #$20
-;    sta PPUADDR 
-;    lda #$00
-;    sta PPUADDR     ; $2000 = namtable 1 
-;    ldx #0
+    lda #$20
+    sta PPUADDR 
+    lda #$00
+    sta PPUADDR     ; $2000 = namtable 1 
+    ldx #0
 .namloop:
-;    lda NamData,x 
-;    sta PPUDATA
-;    inx 
-;    bne .namloop
+    lda NamData,x 
+    sta PPUDATA
+    inx 
+    bne .namloop
 .namloop2:
-;    lda NamData+256,x
-;    sta PPUDATA
-;    inx 
-;    bne .namloop2
+    lda NamData+256,x
+    sta PPUDATA
+    inx 
+    bne .namloop2
 .namloop3:
-;    lda NamData+512,x
-;    sta PPUDATA 
-;    inx 
-;    bne .namloop3
+    lda NamData+512,x
+    sta PPUDATA 
+    inx 
+    bne .namloop3
 .namloop4:
-;    lda NamData+768,x
-;    sta PPUDATA 
-;    inx 
-;    bne .namloop4       ; flood all 1kb into ppu 
+    lda NamData+768,x
+    sta PPUDATA 
+    inx 
+    bne .namloop4       ; flood all 1kb into ppu 
     ; the last 64 bytes are the atr table.
 
-    ; initialize sprite 1-4 for player
-    ; 50,50 0/3
-    ; 58,50 4/7
-    ; 50,58 8/11
-    ; 58,58 12/15
+; INITIALIZE PLAYER SPRITES 
 Player_Y1 EQU PlayerSprites
 Player_X1 EQU PlayerSprites+3
 Player_Y2 EQU PlayerSprites+4
@@ -210,12 +207,13 @@ Player_SPR2 EQU PlayerSprites+5
 Player_SPR3 EQU PlayerSprites+9
 Player_SPR4 EQU PlayerSprites+13
 
-    lda #50
+    lda #90
     sta PlayerSprites       ; y1
     sta PlayerSprites+3     ; x1
     sta PlayerSprites+7     ; y2
     sta PlayerSprites+8     ; y3 
-    lda #58
+    clc
+    adc #8
     sta PlayerSprites+4     ; y2
     sta PlayerSprites+11    ; x3
     sta PlayerSprites+12    ; y4
@@ -267,10 +265,10 @@ brk_vec:
 ; Graphic data: 
 PalData:
     .incbin "miasma1.pal"  ; 32 by
-;NamData:
-;    .incbin "db1.nam"       ; 960 by 
-;AtrData:
-;    .incbin "db1.atr"       ; 64 by   This should be at the end of every .nam file.
+NamData:
+    .incbin "miasma1.nam"       ; 960 by 
+AtrData:
+    .incbin "miasma1.atr"       ; 64 by   This should be at the end of every .nam file.
     ; ^ These files will be stored in other banks and swapped out as needed
     ; then must be copied into the PPU. 
 
