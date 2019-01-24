@@ -49,15 +49,20 @@ PPUADDR   EQU $2006
 PPUDATA   EQU $2007
 APUDMC    EQU $4010
 OAMDMA    EQU $4014 
+JOYPAD1   EQU $4016
 APUFRAME  EQU $4017
 
  .bank 0
+
  .org $0000
     ; zp vars/clobbers 
+read_buttons: .byte 0
+
  .org $0010
     ; globals 
 PlayerX: .byte 0 
 PlayerY: .byte 0
+oncePerFrameFlag: .byte 0
 
  .org $0200
     ; OAM/SPRITES VARIABLES 
@@ -208,17 +213,11 @@ Player_SPR3 EQU PlayerSprites+9
 Player_SPR4 EQU PlayerSprites+13
 
     lda #90
-    sta PlayerSprites       ; y1
-    sta PlayerSprites+3     ; x1
-    sta PlayerSprites+7     ; y2
-    sta PlayerSprites+8     ; y3 
-    clc
-    adc #8
-    sta PlayerSprites+4     ; y2
-    sta PlayerSprites+11    ; x3
-    sta PlayerSprites+12    ; y4
-    sta PlayerSprites+15    ; x4
-    lda #$0a
+    sta PlayerX 
+    sta PlayerY 
+
+    jsr UpdatePlayerSprites
+    lda #$0a                ; and initialize sprites 
     sta PlayerSprites+1     ; index 1
     lda #$0b
     sta PlayerSprites+9     ; index 3
@@ -239,11 +238,107 @@ Player_SPR4 EQU PlayerSprites+13
     cli             ; IRQs on
 
 
-    ;;;;;;;;;;;;;;;
-    ; MAIN CODE   ;
-    ;;;;;;;;;;;;;;;
+ ;;;;;;;;;;;;;;;
+ ; MAIN CODE   ;
+ ;;;;;;;;;;;;;;;
+
+JOYRIGHT_MASK EQU %00000001
+JOYLEFT_MASK EQU %00000010
+JOYDOWN_MASK EQU %00000100
+JOYUP_MASK EQU %00001000
+
+
 loop:
+;;;;;; ONCE PER FRAME ;;;;;;;;
+    lda #1
+    bit oncePerFrameFlag
+    beq .runFrame
+    jmp skipFrameCode
+.runFrame:
+
+;;;;; Read Joypad 1
+readjoy:
+    lda #$01
+    sta JOYPAD1
+    sta read_buttons
+    lsr a 
+    sta JOYPAD1 
+.readjoy_loop:
+    lda JOYPAD1
+    lsr a 
+    rol read_buttons 
+    bcc .readjoy_loop
+    ; end readjoy loop 
+
+;;;;; Perform Button Code 
+ButtonCode:
+    lda #JOYRIGHT_MASK
+    bit read_buttons
+    bne .right_pressed
+    lda #JOYLEFT_MASK
+    bit read_buttons
+    bne .left_pressed
+    jmp .check_updown
+.right_pressed:
+    inc PlayerX
+    inc PlayerX 
+    jmp .check_updown
+.left_pressed:
+    dec PlayerX 
+    dec PlayerX
+.check_updown:
+    lda #JOYUP_MASK
+    bit read_buttons
+    bne .up_pressed
+    lda #JOYDOWN_MASK
+    bit read_buttons
+    bne .down_pressed
+    jmp .end_read_buttons
+.up_pressed:
+    dec PlayerY
+    dec PlayerY 
+    jmp .end_read_buttons
+.down_pressed:
+    inc PlayerY
+    inc PlayerY 
+    ; jmp end_read_buttons ; commented since its the end of the loop
+    ; end read buttons loop 
+.end_read_buttons:
+
+; update position of player sprs 
+    jsr UpdatePlayerSprites
+
+    lda #1
+    sta oncePerFrameFlag
+skipFrameCode:
+
     jmp loop
+
+;;;;;;;;;;;;;;;;;;;
+; DRAW CODE       ;
+;;;;;;;;;;;;;;;;;;;
+
+UpdatePlayerSprites:
+    lda PlayerX
+    sta PlayerSprites+3     ; x1 o
+    sta PlayerSprites+7     ; x2 o
+    clc
+    adc #8
+    sta PlayerSprites+11    ; x3 o
+    sta PlayerSprites+15    ; x4 o 
+    lda PlayerY
+    sta PlayerSprites       ; y1 o
+    sta PlayerSprites+8     ; y3 o
+    clc 
+    adc #8
+    sta PlayerSprites+4     ; y2 o
+    sta PlayerSprites+12    ; y4 o
+
+    rts 
+
+;;;;;;;;;;;;;
+; VBLANK    ;
+;;;;;;;;;;;;;
 
 vblank:
     
@@ -252,6 +347,9 @@ vblank:
     sta OAMADDR
     lda #$02
     sta OAMDMA  
+
+    lda #0
+    sta oncePerFrameFlag ; clear flag so its ok to run again
 
     rti 
 
