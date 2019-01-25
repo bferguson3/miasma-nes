@@ -52,26 +52,46 @@ OAMDMA    EQU $4014
 JOYPAD1   EQU $4016
 APUFRAME  EQU $4017
 
+JOYRIGHT_MASK EQU %00000001
+JOYLEFT_MASK EQU %00000010
+JOYDOWN_MASK EQU %00000100
+JOYUP_MASK EQU %00001000
+
  .bank 0
 
  .org $0000
     ; zp vars/clobbers 
 read_buttons: .byte 0
+; $01 unused 
 ; $02 and $03 clobbers 
 
  .org $0010
     ; globals 
 PlayerX: .byte 0 
 PlayerY: .byte 0
-oncePerFrameFlag: .byte 0
-everyOtherFrame: .byte 0
-frameCounter: .byte 0
+oncePerFrameFlag: .byte 0 ; toggles on at beginning of frame and off at end of vblank
+everyOtherFrame: .byte 0  ; toggles on and off every other frame 
+frameCounter: .byte 0     ; 0-255 and loop every frame advance
+idleCounter: .byte 0 
 
  .org $0200
     ; OAM/SPRITES VARIABLES 
     ; These must be initialized in code as they cannot be written to directly 
 Sprite_0 EQU $0200 
 PlayerSprites EQU $0204     ; $0204-$0213 
+; helper vars 
+Player_Y1 EQU PlayerSprites
+Player_X1 EQU PlayerSprites+3
+Player_Y2 EQU PlayerSprites+4
+Player_X2 EQU PlayerSprites+7
+Player_Y3 EQU PlayerSprites+8
+Player_X3 EQU PlayerSprites+11
+Player_Y4 EQU PlayerSprites+12
+Player_X4 EQU PlayerSprites+15
+Player_SPR1 EQU PlayerSprites+1
+Player_SPR2 EQU PlayerSprites+5
+Player_SPR3 EQU PlayerSprites+9
+Player_SPR4 EQU PlayerSprites+13
 
 
  .org $8000 ; code bank start
@@ -143,7 +163,7 @@ configure_MMC1:
 .clrmem:
     sta $000,x 
     sta $100,x
-    sta $200,x 
+    sta $200,x ; yes, clear oam-ram
     sta $300,x
     sta $400,x
     sta $500,x
@@ -179,60 +199,18 @@ init:
     ldy #high(NamData)
     lda #$20
     jsr LoadTable_XYToA
-    
-;    lda 0
-;    sta PPUADDR
-;    sta PPUADDR
-
-;    ldx #low(NamData2)
-;    ldy #high(NamData2)
-;    lda #$24
-;    jsr LoadTable_XYToA    
-
+; nametable 2 data 
+    ldx #low(NamData2)
+    ldy #high(NamData2)
     lda #$24
-    sta PPUADDR 
-    lda #$00
-    sta PPUADDR      
-    ldx #0
-.nam2loop:
-    lda NamData2,x
-    sta PPUDATA
-    inx 
-    bne .nam2loop
-.nam2loop2:
-    lda NamData2+256,x 
-    sta PPUDATA 
-    inx 
-    bne .nam2loop2
-.nam2loop3:
-    lda NamData2+512,x 
-    sta PPUDATA 
-    inx 
-    bne .nam2loop3
-.nam2loop4:
-    lda NamData2+768,x 
-    sta PPUDATA 
-    inx 
-    bne .nam2loop4
-; INITIALIZE PLAYER SPRITES 
-Player_Y1 EQU PlayerSprites
-Player_X1 EQU PlayerSprites+3
-Player_Y2 EQU PlayerSprites+4
-Player_X2 EQU PlayerSprites+7
-Player_Y3 EQU PlayerSprites+8
-Player_X3 EQU PlayerSprites+11
-Player_Y4 EQU PlayerSprites+12
-Player_X4 EQU PlayerSprites+15
-Player_SPR1 EQU PlayerSprites+1
-Player_SPR2 EQU PlayerSprites+5
-Player_SPR3 EQU PlayerSprites+9
-Player_SPR4 EQU PlayerSprites+13
+    jsr LoadTable_XYToA    
+
+;; INITIALIZE PLAYER SPRITES 
 
     lda #90
     sta PlayerX 
     sta PlayerY 
-
-    jsr UpdatePlayerSprites
+    jsr MovePlayerSprites
     lda #$0a                ; and initialize sprites 
     sta PlayerSprites+1     ; index 1
     lda #$0b
@@ -259,17 +237,12 @@ Player_SPR4 EQU PlayerSprites+13
  ; MAIN CODE   ;
  ;;;;;;;;;;;;;;;
 
-JOYRIGHT_MASK EQU %00000001
-JOYLEFT_MASK EQU %00000010
-JOYDOWN_MASK EQU %00000100
-JOYUP_MASK EQU %00001000
-
 loop:
 
     lda #1
     bit oncePerFrameFlag
     beq .runFrame
-    jmp skipFrameCode
+    jmp skipFrameCode           ; if already run per-frame code, skip it
 .runFrame:
 ;;;;;; ONCE PER FRAME ;;;;;;;;
 
@@ -329,11 +302,14 @@ ButtonCode:
 .end_read_buttons:
 
 ; update position of player sprs 
-    jsr UpdatePlayerSprites
+    jsr MovePlayerSprites
 
     lda #1
-    sta oncePerFrameFlag
+    sta oncePerFrameFlag        ; toggle flag this code has already been run 
 skipFrameCode:
+
+; increase idle counter (rng)
+    inc idleCounter
 
     jmp loop
 
@@ -344,7 +320,7 @@ skipFrameCode:
 LoadTable_XYToA:
 ;;; $yyxx = nametable location 
 ;;; $aa = PPU address * $100 ; $2000 = namtable 1 / $24 / $28 / $2c 
-    ;bit PPUSTATUS
+    bit PPUSTATUS   ; necessary before fresh writes 
     stx $02
     sty $03
     sta PPUADDR 
@@ -352,8 +328,7 @@ LoadTable_XYToA:
     sta PPUADDR      
     ldy #0
 .namloop:
-    ;lda NamData,y 
-    lda [$02],y
+    lda [$02],y     ; $02-$03 contains $xxyy or NamData location: (indirect),y adressing 
     sta PPUDATA
     iny 
     bne .namloop
@@ -379,7 +354,7 @@ LoadTable_XYToA:
 rts
 
 
-UpdatePlayerSprites:
+MovePlayerSprites:
     lda PlayerX
     sta PlayerSprites+3     ; x1 o
     sta PlayerSprites+7     ; x2 o
@@ -402,7 +377,7 @@ UpdatePlayerSprites:
 ;;;;;;;;;;;;;
 
 vblank:
-    
+;; flush $0200-$02ff to oam dma 
     lda #0
     sta OAMADDR
     sta OAMADDR
@@ -413,19 +388,20 @@ vblank:
     bit PPUSTATUS 
 
     lda #%00000001
-    bit frameCounter ; every other frame 
+    bit frameCounter    ; every other frame... 
     beq .z
     lda #0
-    sta PPUSCROLL 
+    sta PPUSCROLL       ; set bg pos = 0
     jmp .p
 .z: lda frameCounter
-    sta PPUSCROLL
+    sta PPUSCROLL       ; or to 0-255
 .p: lda #0
     sta PPUSCROLL 
-    ; eoring bit 0 of  will toggle it every frame.
+    
+    ; eor %1 will toggle that bit on/off 
 
     lda #0
-    sta oncePerFrameFlag ; clear flag so its ok to run again
+    sta oncePerFrameFlag ; clear flag so its ok to run next frame.
 
     rti 
 
@@ -438,15 +414,15 @@ brk_vec:
 
 ; Graphic data: 
 PalData:
-    .incbin "miasma1.pal"  ; 32 by
+    .incbin "miasma1.pal"       ; 32 by
 NamData:
     .incbin "miasma1.nam"       ; 960 by 
 AtrData:
     .incbin "miasma1.atr"       ; 64 by   This should be at the end of every .nam file.
 NamData2:
- .incbin "miasma2.nam"
+    .incbin "miasma2.nam"
 AtrData2:
- .incbin "miasma2.atr"
+    .incbin "miasma2.atr"
     ; ^ These files will be stored in other banks and swapped out as needed
     ; then must be copied into the PPU. 
  
