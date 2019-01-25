@@ -1,3 +1,13 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;  MIASMA - a shmup for NES written in 100% assembly
+; art by railslave
+;  gfx+music by ben ferguson
+;   (c) 2019
+; miasma.asm - primary assembler file 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
  .inesprg 2 ; 2 bank of 16kb data (banks 0-3) 
  .ineschr 2 ; 2 bank of 8kb chr data (bank 4-5) (32 + 16 = 48)
  .inesmap 1 ; MMC1
@@ -98,236 +108,11 @@ Player_SPR4 EQU PlayerSprites+13
 
  .include "miasma-boot.asm"
 
+ .include "miasma-startup.asm"
+ 
+ .include "miasma-main.asm"
 
-
-;;;;;;;;;;;;;;;;;;;
-;; START GAME CODE
-;;;;;;;;;;;;;;;;;;;
-init:
-    ; before you turn the screen back on, copy in pal/nam/atr data 
-    ; copy in palette data  
-    lda #$3f 
-    sta PPUADDR 
-    lda #$00 
-    sta PPUADDR 
-    ldx #0
-.pal_loop:
-    lda PalData,x 
-    sta PPUDATA 
-    inx 
-    cpx #32
-    bcc .pal_loop
-
-;;;; copy in nametable 1 data 
-    ldx #low(NamData)
-    ldy #high(NamData)
-    lda #$20
-    jsr LoadTable_XYToA
-; nametable 2 data 
-    ldx #low(NamData2)
-    ldy #high(NamData2)
-    lda #$24
-    jsr LoadTable_XYToA    
-
-;; INITIALIZE PLAYER SPRITES 
-
-    lda #90
-    sta PlayerX 
-    sta PlayerY 
-    jsr MovePlayerSprites
-    lda #$0a                ; and initialize sprites 
-    sta PlayerSprites+1     ; index 1
-    lda #$0b
-    sta PlayerSprites+9     ; index 3
-    lda #$1a
-    sta PlayerSprites+5     ; index 2
-    lda #$1b
-    sta PlayerSprites+13    ; index 4
-
-
-    lda #%10010000      ; <fix later
-    ; NMI ON | PPU MASTER | SPRITES 8x8 | BG@$1000 | Sprites@$0000 | VRAM add 1 | N>| Nametable@$2000
-    sta PPUCTRL
-    lda #%00011000
-    ; RGB no emphasis | Show Spr | Show BG | Left sprite column OFF | Left bg column OFF | Greyscale off
-    sta PPUMASK
-    ; remember first read from $2007 is invalid!
-    ; if getting graphical glitches, code is too long from vbl. reset $2006 to $0000 by sta #0 twice
-
-    cli             ; IRQs on
-
-
- ;;;;;;;;;;;;;;;
- ; MAIN CODE   ;
- ;;;;;;;;;;;;;;;
-
-loop:
-
-    lda #1
-    bit oncePerFrameFlag
-    beq .runFrame
-    jmp skipFrameCode           ; if already run per-frame code, skip it
-.runFrame:
-;;;;;; ONCE PER FRAME ;;;;;;;;
-
-;; flip every-other-frame flag 
-    lda #%00000001
-    eor everyOtherFrame
-
-    inc frameCounter
-
-;;;;; Read Joypad 1
-readjoy:
-    lda #$01
-    sta JOYPAD1
-    sta read_buttons
-    lsr a 
-    sta JOYPAD1 
-.readjoy_loop:
-    lda JOYPAD1
-    lsr a 
-    rol read_buttons 
-    bcc .readjoy_loop
-    ; end readjoy loop 
-
-;;;;; Perform Button Code 
-ButtonCode:
-    lda #JOYRIGHT_MASK
-    bit read_buttons
-    bne .right_pressed
-    lda #JOYLEFT_MASK
-    bit read_buttons
-    bne .left_pressed
-    jmp .check_updown
-.right_pressed:
-    inc PlayerX
-    inc PlayerX 
-    jmp .check_updown
-.left_pressed:
-    dec PlayerX 
-    dec PlayerX
-.check_updown:
-    lda #JOYUP_MASK
-    bit read_buttons
-    bne .up_pressed
-    lda #JOYDOWN_MASK
-    bit read_buttons
-    bne .down_pressed
-    jmp .end_read_buttons
-.up_pressed:
-    dec PlayerY
-    dec PlayerY 
-    jmp .end_read_buttons
-.down_pressed:
-    inc PlayerY
-    inc PlayerY 
-    ; jmp end_read_buttons ; commented since its the end of the loop
-    ; end read buttons loop 
-.end_read_buttons:
-
-; update position of player sprs 
-    jsr MovePlayerSprites
-
-    lda #1
-    sta oncePerFrameFlag        ; toggle flag this code has already been run 
-skipFrameCode:
-
-; increase idle counter (rng)
-    inc idleCounter
-
-    jmp loop
-
-;;;;;;;;;;;;;;;;;;;
-; DRAWING SUBROUTINES       ;
-;;;;;;;;;;;;;;;;;;;
-
-LoadTable_XYToA:
-;;; $yyxx = nametable location 
-;;; $aa = PPU address * $100 ; $2000 = namtable 1 / $24 / $28 / $2c 
-    bit PPUSTATUS   ; necessary before fresh writes 
-    stx $02
-    sty $03
-    sta PPUADDR 
-    lda #$00
-    sta PPUADDR      
-    ldy #0
-.namloop:
-    lda [$02],y     ; $02-$03 contains $xxyy or NamData location: (indirect),y adressing 
-    sta PPUDATA
-    iny 
-    bne .namloop
-    inc $03
-.namloop2:
-    lda [$02],y
-    sta PPUDATA
-    iny 
-    bne .namloop2
-    inc $03
-.namloop3:
-    lda [$02],y
-    sta PPUDATA 
-    iny 
-    bne .namloop3
-    inc $03
-.namloop4:
-    lda [$02],y
-    sta PPUDATA 
-    iny 
-    bne .namloop4       ; flood all 1kb into ppu 
-    ; the last 64 bytes are the atr table.
-rts
-
-
-MovePlayerSprites:
-    lda PlayerX
-    sta PlayerSprites+3     ; x1 o
-    sta PlayerSprites+7     ; x2 o
-    clc
-    adc #8
-    sta PlayerSprites+11    ; x3 o
-    sta PlayerSprites+15    ; x4 o 
-    lda PlayerY
-    sta PlayerSprites       ; y1 o
-    sta PlayerSprites+8     ; y3 o
-    clc 
-    adc #8
-    sta PlayerSprites+4     ; y2 o
-    sta PlayerSprites+12    ; y4 o
-
-    rts 
-
-;;;;;;;;;;;;;
-; VBLANK    ;
-;;;;;;;;;;;;;
-
-vblank:
-;; flush $0200-$02ff to oam dma 
-    lda #0
-    sta OAMADDR
-    sta OAMADDR
-    lda #$02
-    sta OAMDMA  
-
-;;; swap background test ;;;
-    bit PPUSTATUS 
-
-    lda #%00000001
-    bit frameCounter    ; every other frame... 
-    beq .z
-    lda #0
-    sta PPUSCROLL       ; set bg pos = 0
-    jmp .p
-.z: lda frameCounter
-    sta PPUSCROLL       ; or to 0-255
-.p: lda #0
-    sta PPUSCROLL 
-    
-    ; eor %1 will toggle that bit on/off 
-
-    lda #0
-    sta oncePerFrameFlag ; clear flag so its ok to run next frame.
-
-    rti 
+ .include "miasma-draw.asm"
 
 ;;;;;;;;;;;;;;;;;;;;;
 ; VECTORS AND IMPORTS
@@ -338,15 +123,15 @@ brk_vec:
 
 ; Graphic data: 
 PalData:
-    .incbin "miasma1.pal"       ; 32 by
+    .incbin "assets/miasma1.pal"       ; 32 by
 NamData:
-    .incbin "miasma1.nam"       ; 960 by 
+    .incbin "assets/miasma1.nam"       ; 960 by 
 AtrData:
-    .incbin "miasma1.atr"       ; 64 by   This should be at the end of every .nam file.
+    .incbin "assets/miasma1.atr"       ; 64 by   This should be at the end of every .nam file.
 NamData2:
-    .incbin "miasma2.nam"
+    .incbin "assets/miasma2.nam"
 AtrData2:
-    .incbin "miasma2.atr"
+    .incbin "assets/miasma2.atr"
     ; ^ These files will be stored in other banks and swapped out as needed
     ; then must be copied into the PPU. 
  
@@ -362,9 +147,9 @@ AtrData2:
 
  .bank 4        ; chr bank 1 of 2
  .org $0000
- .incbin "miasma-test.chr"     ; bg charset 
+ .incbin "assets/miasma-test.chr"     ; bg charset 
 ; .org $1000
     ; sprite charset 
 
  .bank 5        ; chr bank 2 of 2
- .incbin "miasma-test.chr"     ; (replace later) 
+ .incbin "assets/miasma-test.chr"     ; (replace later) 

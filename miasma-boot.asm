@@ -1,6 +1,9 @@
 ;;;;;;;;;;;;;
 ; BOOT CODE
+; miasma-boot.asm
+; (c) 2019 ben ferguson 
 ;;;;;;;;;;;;;
+
 reset:              ; this should be best practice boot code and mapper config.
     sei             ; ignore IRQs (NMI/BRK/Reset doesn't count)
     cld             ; no decimal
