@@ -59,9 +59,25 @@ MovePlayerSprites:
 
     rts 
 
+; TODO:
+;- set scroll to wherever HUD is
+;- sprite 0 hit
+;- set scroll to wherever boss is
+;- if even: 
+;    disable ppu, draw sunray real fast, enable ppu
+;- if odd:
+;    render normally
+; ...also 100 bullet test 
+
 ;;;;;;;;;;;;;
 ; VBLANK    ;
 ;;;;;;;;;;;;;
+
+; Boring Stuff(tm):
+; if the latch in PPUSTATUS (also the vblank flag) is not cleared before a fresh write to 
+; PPUSCROLL or PPUADDR, then the write will likely fail. 
+; Best practice is to flush oam immediately on vblank (~500 cycles) and THEN clear the latch
+; using bit PPUSTATUS as clearing the bit too early will cancel the vblank nmi.
 
 vblank:
 ;; flush $0200-$02ff to oam dma 
