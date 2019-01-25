@@ -57,12 +57,15 @@ APUFRAME  EQU $4017
  .org $0000
     ; zp vars/clobbers 
 read_buttons: .byte 0
+; $02 and $03 clobbers 
 
  .org $0010
     ; globals 
 PlayerX: .byte 0 
 PlayerY: .byte 0
 oncePerFrameFlag: .byte 0
+everyOtherFrame: .byte 0
+frameCounter: .byte 0
 
  .org $0200
     ; OAM/SPRITES VARIABLES 
@@ -140,6 +143,7 @@ configure_MMC1:
 .clrmem:
     sta $000,x 
     sta $100,x
+    sta $200,x 
     sta $300,x
     sta $400,x
     sta $500,x
@@ -170,34 +174,46 @@ init:
     cpx #32
     bcc .pal_loop
 
-    ; copy in nam data 
+;;;; copy in nametable 1 data 
+    ldx #low(NamData)
+    ldy #high(NamData)
     lda #$20
+    jsr LoadTable_XYToA
+    
+;    lda 0
+;    sta PPUADDR
+;    sta PPUADDR
+
+;    ldx #low(NamData2)
+;    ldy #high(NamData2)
+;    lda #$24
+;    jsr LoadTable_XYToA    
+
+    lda #$24
     sta PPUADDR 
     lda #$00
-    sta PPUADDR     ; $2000 = namtable 1 
+    sta PPUADDR      
     ldx #0
-.namloop:
-    lda NamData,x 
+.nam2loop:
+    lda NamData2,x
     sta PPUDATA
     inx 
-    bne .namloop
-.namloop2:
-    lda NamData+256,x
-    sta PPUDATA
-    inx 
-    bne .namloop2
-.namloop3:
-    lda NamData+512,x
+    bne .nam2loop
+.nam2loop2:
+    lda NamData2+256,x 
     sta PPUDATA 
     inx 
-    bne .namloop3
-.namloop4:
-    lda NamData+768,x
+    bne .nam2loop2
+.nam2loop3:
+    lda NamData2+512,x 
     sta PPUDATA 
     inx 
-    bne .namloop4       ; flood all 1kb into ppu 
-    ; the last 64 bytes are the atr table.
-
+    bne .nam2loop3
+.nam2loop4:
+    lda NamData2+768,x 
+    sta PPUDATA 
+    inx 
+    bne .nam2loop4
 ; INITIALIZE PLAYER SPRITES 
 Player_Y1 EQU PlayerSprites
 Player_X1 EQU PlayerSprites+3
@@ -226,6 +242,7 @@ Player_SPR4 EQU PlayerSprites+13
     lda #$1b
     sta PlayerSprites+13    ; index 4
 
+
     lda #%10010000      ; <fix later
     ; NMI ON | PPU MASTER | SPRITES 8x8 | BG@$1000 | Sprites@$0000 | VRAM add 1 | N>| Nametable@$2000
     sta PPUCTRL
@@ -247,14 +264,20 @@ JOYLEFT_MASK EQU %00000010
 JOYDOWN_MASK EQU %00000100
 JOYUP_MASK EQU %00001000
 
-
 loop:
-;;;;;; ONCE PER FRAME ;;;;;;;;
+
     lda #1
     bit oncePerFrameFlag
     beq .runFrame
     jmp skipFrameCode
 .runFrame:
+;;;;;; ONCE PER FRAME ;;;;;;;;
+
+;; flip every-other-frame flag 
+    lda #%00000001
+    eor everyOtherFrame
+
+    inc frameCounter
 
 ;;;;; Read Joypad 1
 readjoy:
@@ -315,8 +338,46 @@ skipFrameCode:
     jmp loop
 
 ;;;;;;;;;;;;;;;;;;;
-; DRAW CODE       ;
+; DRAWING SUBROUTINES       ;
 ;;;;;;;;;;;;;;;;;;;
+
+LoadTable_XYToA:
+;;; $yyxx = nametable location 
+;;; $aa = PPU address * $100 ; $2000 = namtable 1 / $24 / $28 / $2c 
+    ;bit PPUSTATUS
+    stx $02
+    sty $03
+    sta PPUADDR 
+    lda #$00
+    sta PPUADDR      
+    ldy #0
+.namloop:
+    ;lda NamData,y 
+    lda [$02],y
+    sta PPUDATA
+    iny 
+    bne .namloop
+    inc $03
+.namloop2:
+    lda [$02],y
+    sta PPUDATA
+    iny 
+    bne .namloop2
+    inc $03
+.namloop3:
+    lda [$02],y
+    sta PPUDATA 
+    iny 
+    bne .namloop3
+    inc $03
+.namloop4:
+    lda [$02],y
+    sta PPUDATA 
+    iny 
+    bne .namloop4       ; flood all 1kb into ppu 
+    ; the last 64 bytes are the atr table.
+rts
+
 
 UpdatePlayerSprites:
     lda PlayerX
@@ -348,6 +409,15 @@ vblank:
     lda #$02
     sta OAMDMA  
 
+;;; swap background test ;;;
+    bit PPUSTATUS 
+    lda frameCounter
+    sta PPUSCROLL
+    lda $00
+    and #%10000000
+    sta PPUSCROLL  
+    ; eoring the bit will toggle it every frame.
+
     lda #0
     sta oncePerFrameFlag ; clear flag so its ok to run again
 
@@ -367,9 +437,12 @@ NamData:
     .incbin "miasma1.nam"       ; 960 by 
 AtrData:
     .incbin "miasma1.atr"       ; 64 by   This should be at the end of every .nam file.
+NamData2:
+ .incbin "miasma2.nam"
+AtrData2:
+ .incbin "miasma2.atr"
     ; ^ These files will be stored in other banks and swapped out as needed
     ; then must be copied into the PPU. 
-
  
  .bank 1        ; prg bank 1/2 section b 
  .bank 2        ; prg bank 2/2 section a
