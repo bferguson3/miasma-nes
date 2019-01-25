@@ -64,9 +64,10 @@ MovePlayerSprites:
 ;- sprite 0 hit
 ;- set scroll to wherever boss is
 ;- if even: 
-;    disable ppu, draw sunray real fast, enable ppu
+;    ;disable ppu, draw sunray real fast, enable ppu
+;    better idea?: extend sprite 0 hit down to include sunray 
 ;- if odd:
-;    render normally
+;    render hud/bg normally
 ; ...also 100 bullet test 
 
 ;;;;;;;;;;;;;
