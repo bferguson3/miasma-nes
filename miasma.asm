@@ -411,12 +411,18 @@ vblank:
 
 ;;; swap background test ;;;
     bit PPUSTATUS 
-    lda frameCounter
+
+    lda #%00000001
+    bit frameCounter ; every other frame 
+    beq .z
+    lda #0
+    sta PPUSCROLL 
+    jmp .p
+.z: lda frameCounter
     sta PPUSCROLL
-    lda $00
-    and #%10000000
-    sta PPUSCROLL  
-    ; eoring the bit will toggle it every frame.
+.p: lda #0
+    sta PPUSCROLL 
+    ; eoring bit 0 of  will toggle it every frame.
 
     lda #0
     sta oncePerFrameFlag ; clear flag so its ok to run again
