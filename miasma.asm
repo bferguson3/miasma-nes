@@ -11,7 +11,7 @@
  .inesprg 2 ; 2 bank of 16kb data (banks 0-3) 
  .ineschr 2 ; 2 bank of 8kb chr data (bank 4-5) (32 + 16 = 48)
  .inesmap 1 ; MMC1
- .inesmir 0 ; 0=up and down, 1=left/right
+ .inesmir 3 ; vert mirror + battery on
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; NES MEMORY MAP EXAMPLE 8 PAGE RAM:
@@ -73,7 +73,7 @@ JOYUP_MASK EQU %00001000
     ; zp vars/clobbers 
 read_buttons: .byte 0
 ; $01 unused 
-; $02 and $03 clobbers 
+; $02 - $05 clobbers 
 
  .org $0010
     ; globals 
@@ -83,12 +83,21 @@ oncePerFrameFlag: .byte 0 ; toggles on at beginning of frame and off at end of v
 everyOtherFrame: .byte 0  ; toggles on and off every other frame 
 frameCounter: .byte 0     ; 0-255 and loop every frame advance
 idleCounter: .byte 0 
+totalBullets: .byte 0
+array0size: .byte 0
+array1size: .byte 0
+
+temp_nextX: .byte 0
+temp_nextY: .byte 0
+
 
  .org $0200
     ; OAM/SPRITES VARIABLES 
     ; These must be initialized in code as they cannot be written to directly 
 Sprite_0 EQU $0200 
 PlayerSprites EQU $0204     ; $0204-$0213 
+BulletDisplay EQU $0214
+
 ; helper vars 
 Player_Y1 EQU PlayerSprites
 Player_X1 EQU PlayerSprites+3
@@ -103,6 +112,13 @@ Player_SPR2 EQU PlayerSprites+5
 Player_SPR3 EQU PlayerSprites+9
 Player_SPR4 EQU PlayerSprites+13
 
+ .org $0300
+_bulletArray0: .byte 0
+
+ .org $03c8
+_bulletArray1: .byte 0
+
+    ; rest of shit 
 
  .org $8000 ; code bank start
 

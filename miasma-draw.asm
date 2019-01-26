@@ -37,8 +37,8 @@ LoadTable_XYToA:
     sta PPUDATA 
     iny 
     bne .namloop4       ; flood all 1kb into ppu 
-    ; the last 64 bytes are the atr table.
-rts
+    ; the last 64 bytes are the atr table
+    rts
 
 
 MovePlayerSprites:
@@ -59,16 +59,7 @@ MovePlayerSprites:
 
     rts 
 
-; TODO:
-;- set scroll to wherever HUD is
-;- sprite 0 hit
-;- set scroll to wherever boss is
-;- if even: 
-;    ;disable ppu, draw sunray real fast, enable ppu
-;    better idea?: extend sprite 0 hit down to include sunray 
-;- if odd:
-;    render hud/bg normally
-; ...also 100 bullet test 
+
 
 ;;;;;;;;;;;;;
 ; VBLANK    ;
@@ -93,16 +84,11 @@ vblank:
 
 ;    lda #%00000001
 ;    bit frameCounter    ; every other frame... 
-
-
-;.z: lda frameCounter
-;    ;beq .swap           ; if = 0, eor the scroll pos bit 
-;    sta PPUSCROLL       ; or to 0-255
-;.p: lda #0
-;    sta PPUSCROLL 
-
+;; after the frame is drawn, we want to reset the position of the camera
+;; to 0,0 because that's where our HUD is. 
     lda #0
     sta PPUSCROLL
+    lda #0
     sta PPUSCROLL
 
     ; eor %1 will toggle that bit on/off 

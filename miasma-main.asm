@@ -14,8 +14,9 @@ loop:
 ;;;;;; ONCE PER FRAME ;;;;;;;;
 
 ;; flip every-other-frame flag 
-    lda #%00000001
-    eor everyOtherFrame
+    lda everyOtherFrame
+    eor #%00000001
+    sta everyOtherFrame
 
     inc frameCounter
 
@@ -31,11 +32,11 @@ loop:
     ; the code above should wait from end of vblank code until scanline 25, doing nothing in between. 
     lda #0
     sta PPUMASK     ; rendering off 
-    bit PPUSTATUS   ; clear latch 
+    lda PPUSTATUS   ; clear latch 
     lda frameCounter
-    sta PPUSCROLL 
-    lda #0
-    sta PPUSCROLL 
+    sta PPUSCROLL
+    lda frameCounter
+    sta PPUSCROLL
     lda #%00011000
     sta PPUMASK 
 
@@ -93,9 +94,105 @@ ButtonCode:
 
     lda #1
     sta oncePerFrameFlag        ; toggle flag this code has already been run 
+
+    ; draw a new bullet 
+    ;lda #$b2
+    ldx idleCounter
+    lda frameCounter
+    asl a
+    tay 
+    lda #$b2
+    jsr CreateBullet_AXY
+
+; check even/odd frame bit, and 
+; copy ar0 or ar1 bullet objects into BulletDisplay ($0214)
+    ldx #0
+    lda #1
+    bit everyOtherFrame
+    bne .drawarray0        ; if frame bit == 0 draw even 
+     jmp .drawarray1       ; else draw odd 
+.drawarray0:
+    lda _bulletArray0,x 
+    sta BulletDisplay,x 
+    inx 
+    cpx #50*4
+    bcc .drawarray0
+     jmp .endbulletflickercopy
+.drawarray1:
+    lda _bulletArray1,x 
+    sta BulletDisplay,x 
+    inx 
+    cpx #50*4
+    bcc .drawarray1
+     ; jmp end 
+.endbulletflickercopy
+
 skipFrameCode:
 
 ; increase idle counter (rng)
     inc idleCounter
 
     jmp loop
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Non-Draw Subroutines   ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+
+; A is bullet sprite, x = Xpos and y = Ypos 
+CreateBullet_AXY:
+    sta $02
+    stx $03
+    sty $04    
+    ; check bullet total (current max 80)
+    lda totalBullets 
+    cmp #100
+    bcc .notfull
+     jmp .bulletsFull
+.notfull:
+    ; check frame even/odd
+    inc totalBullets
+    lda #1
+    bit everyOtherFrame 
+    beq .even           ; if == 0 then frame is even  
+    jmp .odd 
+.even:
+    ; check array 0
+    lda array0size
+    cmp #50
+    bcc .addtozero
+     jmp .odd       ; if full, go to odd
+.addtozero:
+    ;; else take size 
+    asl a               ;; multiply 4, tax for array ofs
+    asl a
+    tax 
+    ; $04>+0, $03>+3, $02>+1
+    lda $04
+    sta _bulletArray0,x 
+    lda $02 
+    sta _bulletArray0+1,x
+    lda $03
+    sta _bulletArray0+3,x 
+    inc array0size 
+    jmp .bulletsFull 
+.odd:
+    ; check array 1
+    lda array1size 
+    cmp #50
+    bcs .addtozero              ; if full, go to even (should never loop if bullet total < 80)
+    ;; *4, tax 
+    asl a 
+    asl a 
+    tax 
+    lda $04
+    sta _bulletArray1,x 
+    lda $02
+    sta _bulletArray1+1,x 
+    lda $03
+    sta _bulletArray1+3,x 
+    inc array1size
+
+.bulletsFull:   ; just don't draw it 
+    rts 

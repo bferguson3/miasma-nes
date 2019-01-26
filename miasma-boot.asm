@@ -17,7 +17,7 @@ reset:              ; this should be best practice boot code and mapper config.
     stx APUDMC      ; best practice - don't assume will = 0
 configure_MMC1:
     lda #%00011010
-    ; xxx | CHR ROM 4kbx4kb (1) | PRG fixed @$8000, switch bank @$c000 (10) | vert mirror (10) 
+    ; xxx | CHR ROM 4kbx4kb (1) | PRG fixed @$8000, switch bank @$c000 (10) | vert/ud mirror (10) 
     sta $8000
     lsr A
     sta $8000 

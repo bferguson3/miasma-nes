@@ -45,10 +45,40 @@ init:
     lda #$1b
     sta PlayerSprites+13    ; index 4
 
-    lda #23                 ; y=32
+    lda #39                 ; hit = 24-1
     sta Sprite_0
-    lda #1
+    lda #60
     sta Sprite_0+3            ; x=0
+
+
+;;; lots o bullets' test init:
+;    lda #32
+;    sta temp_nextX 
+;    sta temp_nextY 
+;.makeBulletsTestLoop:
+;    lda #$b2   ; bullet sprite 
+;    ldx temp_nextX
+;    ldy temp_nextY
+;    jsr CreateBullet_AXY
+;    lda temp_nextX 
+;    clc 
+;    adc #16
+;    cmp #161
+;    bcs .nextRow
+;    sta temp_nextX
+;    jmp .makeBulletsTestLoop
+;.nextRow:
+;    lda #32
+;    sta temp_nextX
+;    lda temp_nextY 
+;    clc 
+;    adc #16
+;    cmp #193
+;    bcs .donebullettestloop
+;    sta temp_nextY 
+;    jmp .makeBulletsTestLoop
+;;;;;;; end bullet flicker logic test. need to do draw ;;;;; 
+;.donebullettestloop
 
     lda #%10010000      ; <fix later
     ; NMI ON | PPU MASTER | SPRITES 8x8 | BG@$1000 | Sprites@$0000 | VRAM add 1 | N>| Nametable@$2000
