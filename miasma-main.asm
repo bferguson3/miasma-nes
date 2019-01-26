@@ -5,7 +5,6 @@
  ;;;;;;;;;;;;;;;
 
 loop:
-
     lda #1
     bit oncePerFrameFlag
     beq .runFrame
@@ -95,15 +94,7 @@ ButtonCode:
     lda #1
     sta oncePerFrameFlag        ; toggle flag this code has already been run 
 
-    ; draw a new bullet 
-    ;lda #$b2
-    ldx idleCounter
-    lda frameCounter
-    asl a
-    tay 
-    lda #$b2
-    jsr CreateBullet_AXY
-
+ 
 ; check even/odd frame bit, and 
 ; copy ar0 or ar1 bullet objects into BulletDisplay ($0214)
     ldx #0
@@ -119,6 +110,7 @@ ButtonCode:
     bcc .drawarray0
      jmp .endbulletflickercopy
 .drawarray1:
+    ;jsr DeleteBullets1
     lda _bulletArray1,x 
     sta BulletDisplay,x 
     inx 
@@ -127,10 +119,38 @@ ButtonCode:
      ; jmp end 
 .endbulletflickercopy
 
+;; check even/odd frame bit 
+;; run delete subroutine 
+    lda #%00000001
+    bit frameCounter
+    bne .deletefrom0 
+     jmp .deletefrom1
+.deletefrom0 
+    ;jsr DeleteBullets0 
+     jmp .enddeleteperframe
+.deletefrom1 
+    ;jsr DeleteBullets1 
+.enddeleteperframe
+
+      ; draw a new bullet 
+    lda frameCounter
+    asl a 
+    tax  
+    lda idleCounter
+    adc #40 
+    tay  
+    lda #$b2
+    jsr CreateBullet_AXY
+
+
+
 skipFrameCode:
+ ;; at this point, once-per-frame code has been run. 
 
 ; increase idle counter (rng)
     inc idleCounter
+
+ 
 
     jmp loop
 
@@ -138,8 +158,100 @@ skipFrameCode:
 ;; Non-Draw Subroutines   ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+DeleteBullets0:
+    ; meant to run outside of vbl
+    ; scan through array 0. this is to save time and only erase
+    ; the bullets that might need it (half per frame)  
+    ldx #0
+.continuedel0
+    lda _bulletArray0,x ; y pos 
+    cmp #240            ; if <240...
+    bcc .cont2          ; keep checking  
+.delete0                ; else delete it 
+     stx $05            ; clobber the position in the array 
+     lda #0
+     sta _bulletArray0,x 
+     sta _bulletArray0+1,x 
+     sta _bulletArray0+2,x
+     sta _bulletArray0+3,x ; all 4 bytes cleared.
+     jmp .compress0
+.cont2                  ; else check x pos 
+    cmp #44
+    bcc .delete0        ; if < 40 delete, else move on 
+    lda _bulletArray0+3,x ; x pos 
+    cmp #240
+    bcs .delete0        ; if below, move onto next bullet ...
+     stx $05
+     jmp .nextdel0        ; if above, deleteit.
+.compress0
+    dec array0size 
+    dec totalBullets
+    lda _bulletArray0+4,x     ; has first non-empty bullet 
+    sta _bulletArray0,x   ; always shift -4
+    inx 
+    cpx #200
+    
+    bcc .compress0
+    ; shift is done, move back x to $05 and check other bullets.
+.nextdel0
+    ldx $05
+    inx 
+    inx 
+    inx 
+    inx 
+    cpx #200
+    bcs .enddel0 
+    jmp .continuedel0  
+.enddel0
+    rts 
 
-
+DeleteBullets1:
+    ; meant to run outside of vbl
+    ; scan through array 0. this is to save time and only erase
+    ; the bullets that might need it (half per frame)  
+    ldx #0
+.continuedel1
+    lda _bulletArray1,x ; y pos 
+    cmp #240            ; if <240...
+    bcc .cont22          ; keep checking  
+.delete1                ; else delete it 
+     stx $05            ; clobber the position in the array 
+     lda #0
+     sta _bulletArray1,x 
+     sta _bulletArray1+1,x 
+     sta _bulletArray1+2,x
+     sta _bulletArray1+3,x ; all 4 bytes cleared.
+     jmp .compress1
+.cont22                  ; else check x pos 
+    cmp #44
+    bcc .delete1        ; if < 40 delete, else move on 
+    lda _bulletArray1+3,x ; x pos 
+    cmp #240
+    bcs .delete1        ; if below, move onto next bullet ...
+     stx $05
+     jmp .nextdel1        ; if above, deleteit.
+.compress1
+    dec totalBullets
+    dec array1size 
+    
+    lda _bulletArray1+4,x     ; has first non-empty bullet 
+    sta _bulletArray1,x   ; always shift -4
+    inx 
+    cpx #200
+    bcc .compress1
+    ; shift is done, move back x to $05 and check other bullets.
+.nextdel1
+    ldx $05
+    inx 
+    inx 
+    inx 
+    inx 
+    cpx #200
+    bcs .enddel1 
+    jmp .continuedel1  
+.enddel1
+    rts 
+    
 ; A is bullet sprite, x = Xpos and y = Ypos 
 CreateBullet_AXY:
     sta $02
@@ -152,7 +264,6 @@ CreateBullet_AXY:
      jmp .bulletsFull
 .notfull:
     ; check frame even/odd
-    inc totalBullets
     lda #1
     bit everyOtherFrame 
     beq .even           ; if == 0 then frame is even  
@@ -176,6 +287,7 @@ CreateBullet_AXY:
     lda $03
     sta _bulletArray0+3,x 
     inc array0size 
+    inc totalBullets
     jmp .bulletsFull 
 .odd:
     ; check array 1
@@ -193,6 +305,6 @@ CreateBullet_AXY:
     lda $03
     sta _bulletArray1+3,x 
     inc array1size
-
+    inc totalBullets
 .bulletsFull:   ; just don't draw it 
     rts 
