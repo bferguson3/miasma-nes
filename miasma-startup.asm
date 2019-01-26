@@ -25,10 +25,10 @@ init:
     lda #$20
     jsr LoadTable_XYToA
 ; nametable 2 data 
-    ldx #low(NamData2)
-    ldy #high(NamData2)
-    lda #$24
-    jsr LoadTable_XYToA    
+    ;ldx #low(NamData2)
+    ;ldy #high(NamData2)
+    ;lda #$24
+    ;jsr LoadTable_XYToA    
 
 ;; INITIALIZE PLAYER SPRITES 
 
@@ -45,6 +45,10 @@ init:
     lda #$1b
     sta PlayerSprites+13    ; index 4
 
+    lda #23                 ; y=32
+    sta Sprite_0
+    lda #1
+    sta Sprite_0+3            ; x=0
 
     lda #%10010000      ; <fix later
     ; NMI ON | PPU MASTER | SPRITES 8x8 | BG@$1000 | Sprites@$0000 | VRAM add 1 | N>| Nametable@$2000

@@ -91,17 +91,20 @@ vblank:
 ;;; swap background test ;;;
     bit PPUSTATUS 
 
-    lda #%00000001
-    bit frameCounter    ; every other frame... 
-    beq .z
+;    lda #%00000001
+;    bit frameCounter    ; every other frame... 
+
+
+;.z: lda frameCounter
+;    ;beq .swap           ; if = 0, eor the scroll pos bit 
+;    sta PPUSCROLL       ; or to 0-255
+;.p: lda #0
+;    sta PPUSCROLL 
+
     lda #0
-    sta PPUSCROLL       ; set bg pos = 0
-    jmp .p
-.z: lda frameCounter
-    sta PPUSCROLL       ; or to 0-255
-.p: lda #0
-    sta PPUSCROLL 
-    
+    sta PPUSCROLL
+    sta PPUSCROLL
+
     ; eor %1 will toggle that bit on/off 
 
     lda #0

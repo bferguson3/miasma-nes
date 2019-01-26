@@ -125,9 +125,9 @@ brk_vec:
 PalData:
     .incbin "assets/miasma1.pal"       ; 32 by
 NamData:
-    .incbin "assets/miasma1.nam"       ; 960 by 
+    .incbin "assets/maisma_color_tiles.nam"       ; 960 by 
 AtrData:
-    .incbin "assets/miasma1.atr"       ; 64 by   This should be at the end of every .nam file.
+    .incbin "assets/maisma_color_tiles.atr"       ; 64 by   This should be at the end of every .nam file.
 NamData2:
     .incbin "assets/miasma2.nam"
 AtrData2:

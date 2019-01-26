@@ -19,6 +19,26 @@ loop:
 
     inc frameCounter
 
+; before doing anything else, lets wait for sprite 0 clear then hit.
+.sprwait:
+    lda #%01000000
+    bit PPUSTATUS 
+    bne .sprwait       ; idle until sprite 0 hit is clear 
+.spridle:
+    lda #%01000000
+    bit PPUSTATUS 
+    beq .spridle        ; idle until scaline 25 is reached.
+    ; the code above should wait from end of vblank code until scanline 25, doing nothing in between. 
+    lda #0
+    sta PPUMASK     ; rendering off 
+    bit PPUSTATUS   ; clear latch 
+    lda frameCounter
+    sta PPUSCROLL 
+    lda #0
+    sta PPUSCROLL 
+    lda #%00011000
+    sta PPUMASK 
+
 ;;;;; Read Joypad 1
 readjoy:
     lda #$01
